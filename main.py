@@ -4,7 +4,6 @@ from langchain.tools import tool
 from pydantic import BaseModel, Field
 
 from langchain_community.chat_models import ChatLlamaCpp
-from langgraph.checkpoint.memory import InMemorySaver
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.messages import messages_from_dict
 
@@ -15,9 +14,8 @@ from tools import add_numbers, sub_numbers, browser
 # -------- LOCAL LLaMA --------
 llm = ChatLlamaCpp(
     model_path="./gemma-3-4b-it-q4_k_m.gguf",
-    temperature=0.2,
+    temperature=0.5,
     n_ctx=4096,
-    checkpointer=InMemorySaver(),
     verbose=False
 )
 llm_with_tools = llm.bind_tools([add_numbers, sub_numbers, browser])
@@ -27,34 +25,41 @@ llm_with_tools = llm.bind_tools([add_numbers, sub_numbers, browser])
 prompt = """
 You are a tool-using assistant.
 
-You have ONLY two behaviors:
+You solve tasks using either:
+1. Direct reasoning (no tools)
+2. Tools (when required)
 
 -----------------------
 CRITICAL RULES:
 
-- Tool output is the ONLY source of truth
-- You MUST ignore your own knowledge completely
-- You MUST base your final answer ONLY on Observation
-- If Observation exists, you MUST use it
-
-If you ignore the tool result, the answer is WRONG.
+- You MUST follow tool rules exactly.
+- Tool output is the ONLY trusted source for factual or computed results.
+- NEVER invent tool outputs.
+- NEVER guess real-time or factual information.
+- If a tool is required, you MUST use it before answering.
 
 -----------------------
-1. DIRECT ANSWER (no tools)
+1. DIRECT ANSWER (NO TOOLS)
 
-If the user is chatting (hello, hi, how are you):
-→ respond normally
-→ DO NOT use tools
+Use this ONLY for:
+- greetings (hello, hi, how are you)
+- casual conversation
+
+→ Respond naturally
+→ DO NOT use any tool
 
 -----------------------
 2. TOOL USAGE (MANDATORY)
 
-If the question involves:
-- math (+, -)
-- factual information (who, what, when, where, current, latest)
+Use tools for:
+- math problems (+, -)
+- factual questions (who, what, when, where)
+- current / real-time information (latest, today, now, weather, news)
 
-→ You MUST use a tool
-→ You are NOT allowed to answer from your own knowledge
+→ You MUST call a tool
+→ You MUST NOT answer from memory or knowledge
+
+If unsure → use browser tool
 
 -----------------------
 TOOLS:
@@ -67,32 +72,40 @@ Search:
 - browser(query)
 
 -----------------------
-FORMATS:
+REASONING FORMAT (when using tools):
 
-### Math:
+Thought: decide if a tool is needed
 
-Thought: briefly explain what are you doing
-
-Action: add_numbers OR sub_numbers
+Action: tool_name
 Action Input: {"a": number, "b": number}
+(or {"query": "text"} for browser)
 
-### Search:
+Observation: result from tool
 
-Thought: briefly explain what are you doing
-
-Action: browser
-Action Input: {"query": "search query"}
+Repeat Thought/Action if needed.
 
 -----------------------
-After tool result:
+FINAL ANSWER RULE:
 
-You MUST respond:
+After receiving tool result:
 
-Final Answer: <answer based ONLY on tool result>
+Final Answer: <only based on Observation>
+
+- Do NOT include reasoning
+- Do NOT mention tools
+- Do NOT guess beyond Observation
+
+-----------------------
+IMPORTANT:
+
+- If a tool is needed, you MUST NOT answer directly.
+- If no tool is needed, NEVER call a tool.
+- Keep responses short and accurate.
 
 -----------------------
 
-User: """
+User:
+"""
 
 
 system = [SystemMessage(content=prompt)]

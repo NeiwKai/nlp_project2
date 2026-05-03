@@ -27,18 +27,14 @@ class BrowserInput(BaseModel):
 def browser(query: str) -> str:
     """Browse the internet with given query."""
     print("browser() used!")
-    results = DDGS().text(query, max_results=3)
-    final = f"""
-    Result 1:
-    Title: {results[0]["title"]}
-    Body: {results[0]["body"]}
 
-    Result 2:
-    Title: {results[1]["title"]}
-    Body: {results[1]["body"]}
+    results = DDGS().text(query, max_results=5)
 
-    Result 3:
-    Title: {results[2]["title"]}
-    Body: {results[2]["body"]}
-    """
-    return final
+    # format results into clean text for LLM
+    formatted = []
+    for r in results:
+        formatted.append(
+            f"Title: {r.get('title')}\nSnippet: {r.get('body', '')}\n"
+        )
+
+    return "\n".join(formatted)
